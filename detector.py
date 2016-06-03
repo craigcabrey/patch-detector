@@ -12,7 +12,8 @@ import yaml
 
 whitelist = set()
 
-resources_path = os.path.join(os.path.realpath(sys.path[0]), 'resources')
+module_path = os.path.dirname(os.path.realpath(__file__))
+resources_path = os.path.join(module_path, 'resources')
 
 try:
     with open(os.path.join(resources_path, 'languages.yml'), 'r') as file:
@@ -26,11 +27,7 @@ for key, value in languages.items():
         whitelist.update(value['extensions'])
 
 def whitelisted(name):
-    for item in whitelist:
-        if name.lower().endswith(item):
-            return True
-
-    return False
+    return any(name.lower().endswith(item) for item in whitelist)
 
 def compare(first, second):
     return all(token in second.strip().split() for token in first.strip().split())
@@ -67,6 +64,8 @@ def run(config):
         total_deletions = 0
         detected_additions = 0
         detected_deletions = 0
+
+        ratios[diff.header.new_path] = {}
 
         if os.path.exists(full_path):
             file = open(full_path, 'rb')
@@ -118,9 +117,13 @@ def run(config):
 
                 if config.debug:
                     print('Detected ratio: {0}'.format(ratios[diff.header.new_path]))
+
+            ratios[diff.header.new_path]['present'] = True
         else:
             if config.debug:
                 print('WARNING: File {0} does not exist'.format(full_path))
+
+            ratios[diff.header.new_path]['present'] = False
 
             for change in diff.changes:
                 # Ignore empty or whitespace lines
@@ -149,17 +152,19 @@ def run(config):
         total_patch_additions += total_additions
         total_patch_deletions += total_deletions
 
-        ratios[diff.header.new_path] = {
-            'additions': detected_additions / total_additions,
-            'deletions': detected_deletions / total_deletions,
-        }
+        ratios[diff.header.new_path]['additions'] = detected_additions / total_additions
+        ratios[diff.header.new_path]['deletions'] = detected_deletions / total_deletions
+
+    # We are confident unless all files of the change set cannot be found
+    confident = not all(not value['present'] for key, value in ratios.items())
 
     result = {
         'overall': {
             'additions': detected_patch_additions / total_patch_additions,
-            'deletions': detected_patch_deletions / total_patch_deletions
+            'deletions': detected_patch_deletions / total_patch_deletions,
+            'confident': confident
         },
-        'individual': ratios
+        'breakdown': ratios
     }
 
     return result
