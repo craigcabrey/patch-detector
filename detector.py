@@ -11,6 +11,7 @@ import whatthepatch
 import yaml
 
 whitelist = set()
+blacklist = ['test', 'tests', 'spec']
 
 module_path = os.path.dirname(os.path.realpath(__file__))
 resources_path = os.path.join(module_path, 'resources')
@@ -28,6 +29,9 @@ for key, value in languages.items():
 
 def whitelisted(name):
     return any(name.lower().endswith(item) for item in whitelist)
+
+def blacklisted(name):
+    return any(item in name.lower() for item in blacklist)
 
 def compare(first, second):
     return all(token in second.strip().split() for token in first.strip().split())
@@ -57,7 +61,7 @@ def run(config):
                         full_path
                     ))
 
-        if not whitelisted(os.path.basename(full_path)):
+        if blacklisted(full_path) or not whitelisted(full_path):
             continue
 
         total_additions = 0
