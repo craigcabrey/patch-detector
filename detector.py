@@ -41,7 +41,7 @@ def run(config):
 
     ratios = {}
 
-    for diff in whatthepatch.parse_patch(config.patch):
+    for diff in config.patch:
         new_source_path = os.path.join(config.project, diff.header.new_path)
         old_source_path = os.path.join(config.project, diff.header.old_path)
 
@@ -200,7 +200,7 @@ def process_arguments():
 
 def main():
     config = process_arguments()
-    config.patch = config.patch.read()
+    config.patch = whatthepatch.parse_patch(config.patch.read())
     print(json.dumps(run(config), indent=4))
 
 if __name__ == '__main__':

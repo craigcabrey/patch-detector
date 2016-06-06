@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 
 import argparse
-import git
 import json
 import os
 import pkg_resources
 import re
 import sys
+
+import git
 import tqdm
+import whatthepatch
 
 import detector
 
@@ -98,7 +100,7 @@ def run_git(config):
         versions = tqdm.tqdm(versions)
 
     version_results = {}
-    config.patch = config.patch.read()
+    config.patch = [diff for diff in whatthepatch.parse_patch(config.patch.read())]
 
     try:
         for version in versions:
