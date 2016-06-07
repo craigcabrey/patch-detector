@@ -12,6 +12,7 @@ import tqdm
 import whatthepatch
 
 import detector
+import resolver
 
 
 sha1_regex = re.compile('([a-f0-9]{40})')
@@ -126,7 +127,19 @@ def run_git(config):
             repo.git.reset('--hard')
             repo.git.clean('-df')
             repo.git.checkout(version)
-            config.patch = patch
+
+            diffs = []
+            for diff in patch:
+                path = resolver.resolve_path(
+                    repo, sha, version, diff.header.new_path, config.debug
+                )
+
+                header = diff.header._replace(new_path=path)
+
+                adjusted_diff = diff._replace(header=header)
+                diffs.append(adjusted_diff)
+
+            config.patch = diffs
             version_results[version] = detector.run(config)
             repo.git.checkout(active_branch)
 
