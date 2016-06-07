@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import os
+
 import git
 
 def resolve_path(repo, start, end, path, debug=False):
@@ -9,15 +11,20 @@ def resolve_path(repo, start, end, path, debug=False):
         )
 
         prev = repo.commit(start)
-        prev_path = None
+        prev_path = True
 
-        for diff in prev.parents[0].diff(prev):
-            if diff.b_path == path:
-                prev_path = path
+        tree = prev.tree
+        for path_element in path.split(os.path.sep):
+            try:
+                tree = tree[path_element]
+            except KeyError:
+                prev_path = False
                 break
 
         if not prev_path:
             raise Exception('Path does not exist in start object')
+
+        prev_path = tree.path
 
         if debug:
             print('Start: ' + prev_path)
@@ -72,5 +79,6 @@ if __name__ == '__main__':
         git.Repo(sys.argv[1]),
         sys.argv[2],
         sys.argv[3],
-        sys.argv[4]
+        sys.argv[4],
+        True
     )
