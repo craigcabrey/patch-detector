@@ -14,6 +14,8 @@ import whatthepatch
 import detector
 
 
+sha1_regex = re.compile('([a-f0-9]{40})')
+
 class Color:
    PURPLE = '\033[95m'
    CYAN = '\033[96m'
@@ -100,7 +102,18 @@ def run_git(config):
         versions = tqdm.tqdm(versions)
 
     version_results = {}
-    config.patch = [diff for diff in whatthepatch.parse_patch(config.patch.read())]
+    patch_text = config.patch.read()
+    patch = [diff for diff in whatthepatch.parse_patch(patch_text)]
+
+    match = sha1_regex.match(patch_text.split()[1])
+
+    if match:
+        sha = match.group(1)
+    else:
+        raise Exception('No commit hash found in patch')
+
+    if config.debug:
+        print('Starting from commit sha {}'.format(sha))
 
     try:
         for version in versions:
@@ -113,12 +126,18 @@ def run_git(config):
             repo.git.reset('--hard')
             repo.git.clean('-df')
             repo.git.checkout(version)
+            config.patch = patch
             version_results[version] = detector.run(config)
             repo.git.checkout(active_branch)
 
             if config.debug:
                 print('Removing {0}'.format(version))
+    except git.exc.GitCommandError as e:
+        error(str(e))
+        version_results = None
     except KeyboardInterrupt:
+        pass
+    finally:
         print('\r', end='')
         repo.git.reset('--hard')
         repo.git.clean('-df')
@@ -202,7 +221,9 @@ def main():
     )
 
     version_results = run(config)
-    json.dump(version_results, config.results, sort_keys=True, indent=4)
+
+    if version_results:
+        json.dump(version_results, config.results, sort_keys=True, indent=4)
 
 if __name__ == '__main__':
     main()
