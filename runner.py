@@ -130,14 +130,17 @@ def run_git(config):
 
             diffs = []
             for diff in patch:
-                path = resolver.resolve_path(
-                    repo, sha, version, diff.header.new_path, config.debug
-                )
+                try:
+                    path = resolver.resolve_path(
+                        repo, sha, version, diff.header.new_path, config.debug
+                    )
 
-                header = diff.header._replace(new_path=path)
+                    header = diff.header._replace(new_path=path)
 
-                adjusted_diff = diff._replace(header=header)
-                diffs.append(adjusted_diff)
+                    adjusted_diff = diff._replace(header=header)
+                    diffs.append(adjusted_diff)
+                except:
+                    diffs.append(diff)
 
             config.patch = diffs
             version_results[version] = detector.run(config)
