@@ -156,8 +156,8 @@ def run(config):
         total_patch_additions += total_additions
         total_patch_deletions += total_deletions
 
-        ratios[diff.header.new_path]['additions'] = detected_additions / total_additions
-        ratios[diff.header.new_path]['deletions'] = detected_deletions / total_deletions
+        ratios[diff.header.new_path]['additions'] = detected_additions / total_additions if total_additions > 0 else None
+        ratios[diff.header.new_path]['deletions'] = detected_deletions / total_deletions if total_deletions > 0 else None
 
     # We are confident unless all files of the change set cannot be found
     confident = not all(not value['present'] for key, value in ratios.items())
