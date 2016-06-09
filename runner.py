@@ -15,8 +15,6 @@ import detector
 import resolver
 
 
-sha1_regex = re.compile('([a-f0-9]{40})')
-
 class Color:
    PURPLE = '\033[95m'
    CYAN = '\033[96m'
@@ -69,6 +67,8 @@ def run(config):
 
 
 def run_git(config):
+    sha1_regex = re.compile('([a-f0-9]{40})')
+
     full_path = os.path.abspath(config.project)
 
     try:
@@ -124,6 +124,8 @@ def run_git(config):
             if config.debug:
                 print('Checking out {0}'.format(version))
 
+            if version not in repo.tags:
+                raise ValueError('No such version "{}"'.format(version))
             repo.git.reset('--hard')
             repo.git.clean('-df')
             repo.git.checkout(version)
@@ -139,7 +141,10 @@ def run_git(config):
 
                     adjusted_diff = diff._replace(header=header)
                     diffs.append(adjusted_diff)
-                except:
+                except Exception as e:
+                    if config.debug:
+                        error(e)
+
                     diffs.append(diff)
 
             config.patch = diffs
@@ -148,11 +153,11 @@ def run_git(config):
 
             if config.debug:
                 print('Removing {0}'.format(version))
-    except git.exc.GitCommandError as e:
-        error(str(e))
-        version_results = None
     except KeyboardInterrupt:
         pass
+    except Exception as e:
+        error(str(e))
+        version_results = None
     finally:
         print('\r', end='')
         repo.git.reset('--hard')
