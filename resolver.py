@@ -23,14 +23,33 @@ def resolve_path(repo, first, second, path, debug=False):
 
     blob_path = tree.path
 
-    for diff in first.diff(second):
-        if diff.a_path == blob_path:
-            if diff.deleted_file:
-                blob_path = 'deleted'
-            else:
-                blob_path = diff.b_path
+    results = repo.git.log(
+        '--all',
+        '--follow',
+        '--format=%H',
+        '--diff-filter=A',
+        '--',
+        path,
+    ).splitlines()
 
-            break
+    if debug:
+        print(results)
+
+    assert results
+
+    creation_commit = repo.commit(results[0])
+
+    if repo.is_ancestor(creation_commit, second):
+        for diff in first.diff(second):
+            if diff.a_path == blob_path:
+                if diff.deleted_file:
+                    blob_path = 'deleted'
+                else:
+                    blob_path = diff.b_path
+
+                break
+    else:
+        blob_path = 'non-existant'
 
     return blob_path
 
