@@ -64,12 +64,38 @@ def run(config):
         if blacklisted(full_path) or not whitelisted(full_path):
             continue
 
-        total_additions = 0
-        total_deletions = 0
         detected_additions = 0
         detected_deletions = 0
 
         ratios[diff.header.new_path] = {}
+
+        additions = []
+        deletions = []
+
+        for change in diff.changes:
+            # Ignore empty or whitespace lines
+            if not change[2] or change[2].isspace():
+                continue
+            # line was unchanged
+            elif change[0] == change[1]:
+                continue
+            # line was changed, content is the same
+            elif change[0] and change[1] and change[0] != change[1]:
+                continue
+            # line was inserted
+            elif not change[0] and change[1]:
+                additions.append(change[2])
+            # line was removed
+            elif change[0] and not change[1]:
+                deletions.append(change[2])
+            # should never happen
+            else:
+                print('WARNING: Could not detect change type')
+                raise Exception(change)
+
+        if config.debug:
+            print('Modified lines: ', end='')
+            print(set(additions).intersection(deletions))
 
         if os.path.exists(full_path):
             file = open(full_path, 'rb')
@@ -85,42 +111,21 @@ def run(config):
             with open(full_path, 'r', encoding=detection['encoding']) as file:
                 source = file.readlines()
 
-                for change in diff.changes:
-                    # Ignore empty or whitespace lines
-                    if not change[2] or change[2].isspace():
-                        continue
+                for addition in additions:
+                    for line in source:
+                        if compare(addition, line):
+                            detected_additions += 1
+                            break
 
-                    # line was unchanged
-                    if change[0] == change[1]:
-                        continue
-                    # line was changed, content is the same
-                    elif change[0] and change[1] and change[0] != change[1]:
-                        continue
-                    # line was inserted
-                    elif not change[0] and change[1]:
-                        total_additions += 1
-                        for line in source:
-                            if compare(change[2], line):
-                                detected_additions += 1
-                                break
-                    # line was removed
-                    elif change[0] and not change[1]:
-                        total_deletions += 1
-                        found = False
-                        for line in source:
-                            if compare(change[2], line):
-                                found = True
-                                break
+                for deletion in deletions:
+                    found = False
+                    for line in source:
+                        if compare(deletion, line):
+                            found = True
+                            break
 
-                        if not found:
-                            detected_deletions += 1
-                    # should never happen
-                    else:
-                        print('WARNING: Could not detect change type')
-                        raise Exception(change)
-
-                if config.debug:
-                    print('Detected ratio: {0}'.format(ratios[diff.header.new_path]))
+                    if not found:
+                        detected_deletions += 1
 
             ratios[diff.header.new_path]['present'] = True
         else:
@@ -129,32 +134,17 @@ def run(config):
 
             ratios[diff.header.new_path]['present'] = False
 
-            for change in diff.changes:
-                # Ignore empty or whitespace lines
-                if not change[2] or change[2].isspace():
-                    continue
-                # line was unchanged
-                elif change[0] == change[1]:
-                    continue
-                # line was changed, content is the same
-                elif change[0] and change[1] and change[0] != change[1]:
-                    continue
-                # line was inserted
-                elif not change[0] and change[1]:
-                    total_additions += 1
-                # line was removed
-                elif change[0] and not change[1]:
-                    total_deletions += 1
-                # should never happen
-                else:
-                    print('WARNING: Could not detect change type')
-                    raise Exception(change)
-
         detected_patch_additions += detected_additions
         detected_patch_deletions += detected_deletions
 
+        total_additions = len(additions)
+        total_deletions = len(deletions)
+
         total_patch_additions += total_additions
         total_patch_deletions += total_deletions
+
+        assert detected_additions <= total_additions
+        assert detected_deletions <= total_deletions
 
         ratios[diff.header.new_path]['additions'] = detected_additions / total_additions if total_additions > 0 else None
         ratios[diff.header.new_path]['deletions'] = detected_deletions / total_deletions if total_deletions > 0 else None
