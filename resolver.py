@@ -32,9 +32,6 @@ def resolve_path(repo, first, second, path, debug=False):
         path,
     ).splitlines()
 
-    if debug:
-        print(results)
-
     assert results
 
     creation_commit = repo.commit(results[0])
@@ -43,15 +40,16 @@ def resolve_path(repo, first, second, path, debug=False):
         for diff in first.diff(second):
             if diff.a_path == blob_path:
                 if diff.deleted_file:
-                    blob_path = 'deleted'
+                    result = 'deleted'
                 else:
                     blob_path = diff.b_path
+                    result = 'found'
 
                 break
     else:
-        blob_path = 'non-existant'
+        result = 'non-existant'
 
-    return blob_path
+    return (blob_path, result)
 
 if __name__ == '__main__':
     import sys

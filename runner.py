@@ -13,6 +13,7 @@ import whatthepatch
 
 import detector
 import resolver
+import util
 
 
 class Color:
@@ -104,7 +105,7 @@ def run_git(config):
 
     version_results = {}
     patch_text = config.patch.read()
-    patch = [diff for diff in whatthepatch.parse_patch(patch_text)]
+    patch = util.load_patch(patch_text)
 
     match = sha1_regex.match(patch_text.split()[1])
 
@@ -132,11 +133,14 @@ def run_git(config):
 
             diffs = []
             for diff in patch:
-                path = resolver.resolve_path(
+                result = resolver.resolve_path(
                     repo, sha, version, diff.header.new_path, config.debug
                 )
 
-                header = diff.header._replace(new_path=path)
+                if config.debug:
+                    print(result)
+
+                header = diff.header._replace(path=result[0], status=result[1])
 
                 adjusted_diff = diff._replace(header=header)
                 diffs.append(adjusted_diff)

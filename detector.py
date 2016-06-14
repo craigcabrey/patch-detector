@@ -10,6 +10,8 @@ import chardet
 import whatthepatch
 import yaml
 
+import util
+
 whitelist = set()
 blacklist = ['test', 'tests', 'spec']
 
@@ -46,7 +48,7 @@ def run(config):
     ratios = {}
 
     for diff in config.patch:
-        new_source_path = os.path.join(config.project, diff.header.new_path)
+        new_source_path = os.path.join(config.project, diff.header.path)
         old_source_path = os.path.join(config.project, diff.header.old_path)
 
         full_path = os.path.abspath(new_source_path)
@@ -67,7 +69,7 @@ def run(config):
         detected_additions = 0
         detected_deletions = 0
 
-        ratios[diff.header.new_path] = {}
+        ratios[diff.header.path] = {}
 
         additions = []
         deletions = []
@@ -127,12 +129,12 @@ def run(config):
                     if not found:
                         detected_deletions += 1
 
-            ratios[diff.header.new_path]['present'] = True
+            ratios[diff.header.path]['present'] = True
         else:
             if config.debug:
                 print('WARNING: File {0} does not exist'.format(full_path))
 
-            ratios[diff.header.new_path]['present'] = False
+            ratios[diff.header.path]['present'] = False
 
         detected_patch_additions += detected_additions
         detected_patch_deletions += detected_deletions
@@ -146,8 +148,9 @@ def run(config):
         assert detected_additions <= total_additions
         assert detected_deletions <= total_deletions
 
-        ratios[diff.header.new_path]['additions'] = detected_additions / total_additions if total_additions > 0 else None
-        ratios[diff.header.new_path]['deletions'] = detected_deletions / total_deletions if total_deletions > 0 else None
+        ratios[diff.header.path]['additions'] = detected_additions / total_additions if total_additions > 0 else None
+        ratios[diff.header.path]['deletions'] = detected_deletions / total_deletions if total_deletions > 0 else None
+        ratios[diff.header.path]['status'] = diff.header.status
 
     # We are confident unless all files of the change set cannot be found
     confident = not all(not value['present'] for key, value in ratios.items())
@@ -194,7 +197,7 @@ def process_arguments():
 
 def main():
     config = process_arguments()
-    config.patch = whatthepatch.parse_patch(config.patch.read())
+    config.patch = util.load_patch(config.patch.read())
     print(json.dumps(run(config), indent=4))
 
 if __name__ == '__main__':
