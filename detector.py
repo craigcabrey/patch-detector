@@ -128,13 +128,9 @@ def run(config):
 
                     if not found:
                         detected_deletions += 1
-
-            ratios[diff.header.path]['present'] = True
         else:
             if config.debug:
                 print('WARNING: File {0} does not exist'.format(full_path))
-
-            ratios[diff.header.path]['present'] = False
 
         detected_patch_additions += detected_additions
         detected_patch_deletions += detected_deletions
@@ -153,7 +149,7 @@ def run(config):
         ratios[diff.header.path]['status'] = diff.header.status
 
     # We are confident unless all files of the change set cannot be found
-    confident = not all(not value['present'] for key, value in ratios.items())
+    confident = not all(value['status'] is not 'deleted' for value in ratios.values())
 
     result = {
         'overall': {
