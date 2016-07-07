@@ -74,7 +74,10 @@ def run(config):
         additions = []
         deletions = []
 
-        for change in diff.changes:
+        prev_line = None
+        next_line = None
+
+        for index, change in enumerate(diff.changes):
             # Ignore empty or whitespace lines
             if not change[2] or change[2].isspace():
                 continue
@@ -87,13 +90,33 @@ def run(config):
             # line was inserted
             elif not change[0] and change[1]:
                 additions.append(change[2])
+
+                # keep track of the lines before and after each change
+                if index > 0:
+                    prev_line = diff.changes[index - 1][2]
+                if index < len(diff.changes) - 1:
+                    next_line = diff.changes[index + 1][2]
             # line was removed
             elif change[0] and not change[1]:
                 deletions.append(change[2])
+
+                # keep track of the lines before and after each change
+                if index > 0:
+                    prev_line = diff.changes[index - 1][2]
+                if index < len(diff.changes) - 1:
+                    next_line = diff.changes[index + 1][2]
             # should never happen
             else:
                 print('WARNING: Could not detect change type')
                 raise Exception(change)
+
+
+        one_line_change = bool(additions) ^ bool(deletions)
+
+        if one_line_change and config.debug:
+            print('One line change for {0}'.format(full_path))
+            print('BEFORE: {0}'.format(prev_line))
+            print('AFTER: {0}'.format(next_line))
 
         if config.debug:
             print('Modified lines: ', end='')
@@ -113,21 +136,33 @@ def run(config):
             with open(full_path, 'r', encoding=detection['encoding']) as file:
                 source = file.readlines()
 
-                for addition in additions:
-                    for line in source:
-                        if compare(addition, line):
-                            detected_additions += 1
-                            break
+                # In the case of a one line change, we also look for the lines
+                # immediately preceding and following the changed line.
+                if one_line_change:
+                    for index, line in enumerate(source):
+                        if line.strip() == prev_line.strip() and source[index + 2].strip() == next_line.strip():
+                            if additions and compare(additions[0], source[index + 1]):
+                                detected_additions += 1
+                                break
+                            elif deletions and not compare(deletions[0], source[index + 1]):
+                                detected_deletions += 1
+                                break
+                else:
+                    for addition in additions:
+                        for line in source:
+                            if compare(addition, line):
+                                detected_additions += 1
+                                break
 
-                for deletion in deletions:
-                    found = False
-                    for line in source:
-                        if compare(deletion, line):
-                            found = True
-                            break
+                    for deletion in deletions:
+                        found = False
+                        for line in source:
+                            if compare(deletion, line):
+                                found = True
+                                break
 
-                    if not found:
-                        detected_deletions += 1
+                        if not found:
+                            detected_deletions += 1
         else:
             if config.debug:
                 print('WARNING: File {0} does not exist'.format(full_path))
@@ -153,8 +188,8 @@ def run(config):
 
     result = {
         'overall': {
-            'additions': detected_patch_additions / total_patch_additions,
-            'deletions': detected_patch_deletions / total_patch_deletions,
+            'additions': detected_patch_additions / total_patch_additions if total_patch_additions > 0 else None,
+            'deletions': detected_patch_deletions / total_patch_deletions if total_patch_deletions > 0 else None,
             'confident': confident
         },
         'breakdown': ratios

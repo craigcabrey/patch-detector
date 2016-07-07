@@ -153,9 +153,14 @@ def run_git(config):
                 print('Removing {0}'.format(version))
     except KeyboardInterrupt:
         pass
+    except AssertionError:
+        error('assertion failed!')
+        version_results = None
+        raise
     except Exception as e:
         error(str(e))
         version_results = None
+        raise
     finally:
         print('\r', end='')
         repo.git.reset('--hard')
