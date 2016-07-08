@@ -47,6 +47,8 @@ def run(config):
 
     ratios = {}
 
+    confident = False
+
     for diff in config.patch:
         new_source_path = os.path.join(config.project, diff.header.path)
         old_source_path = os.path.join(config.project, diff.header.old_path)
@@ -71,8 +73,8 @@ def run(config):
 
         ratios[diff.header.path] = {}
 
-        additions = []
-        deletions = []
+        raw_additions = []
+        raw_deletions = []
 
         prev_line = None
         next_line = None
@@ -89,7 +91,7 @@ def run(config):
                 continue
             # line was inserted
             elif not change[0] and change[1]:
-                additions.append(change[2])
+                raw_additions.append(change[2])
 
                 # keep track of the lines before and after each change
                 if index > 0:
@@ -98,7 +100,7 @@ def run(config):
                     next_line = diff.changes[index + 1][2]
             # line was removed
             elif change[0] and not change[1]:
-                deletions.append(change[2])
+                raw_deletions.append(change[2])
 
                 # keep track of the lines before and after each change
                 if index > 0:
@@ -110,19 +112,20 @@ def run(config):
                 print('WARNING: Could not detect change type')
                 raise Exception(change)
 
+        additions = [_ for _ in filter(lambda x: x not in raw_deletions, raw_additions)]
+        deletions = [_ for _ in filter(lambda x: x not in raw_additions, raw_deletions)]
 
-        one_line_change = bool(additions) ^ bool(deletions)
+        one_line_change = bool(len(raw_additions) == 1) ^ bool(len(raw_deletions) == 1)
 
         if one_line_change and config.debug:
             print('One line change for {0}'.format(full_path))
             print('BEFORE: {0}'.format(prev_line))
             print('AFTER: {0}'.format(next_line))
 
-        if config.debug:
-            print('Modified lines: ', end='')
-            print(set(additions).intersection(deletions))
-
         if os.path.exists(full_path):
+            # We are confident if we find *any* of the files in the changeset
+            confident = True
+
             file = open(full_path, 'rb')
             detection = chardet.detect(file.read())
 
@@ -140,7 +143,9 @@ def run(config):
                 # immediately preceding and following the changed line.
                 if one_line_change:
                     for index, line in enumerate(source):
-                        if line.strip() == prev_line.strip() and source[index + 2].strip() == next_line.strip():
+                        if line.strip() == prev_line.strip() and \
+                                index + 2 < len(source) and \
+                                source[index + 2].strip() == next_line.strip():
                             if additions and compare(additions[0], source[index + 1]):
                                 detected_additions += 1
                                 break
@@ -182,9 +187,6 @@ def run(config):
         ratios[diff.header.path]['additions'] = detected_additions / total_additions if total_additions > 0 else None
         ratios[diff.header.path]['deletions'] = detected_deletions / total_deletions if total_deletions > 0 else None
         ratios[diff.header.path]['status'] = diff.header.status
-
-    # We are confident unless all files of the change set cannot be found
-    confident = not all(value['status'] is not 'deleted' for value in ratios.values())
 
     result = {
         'overall': {
