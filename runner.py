@@ -93,7 +93,11 @@ def run_git(config):
         start_version = pkg_resources.SetuptoolsLegacyVersion('0.0.0')
 
     if config.versions:
-        versions = config.versions.strip().split(',')
+        if os.path.exists(config.versions):
+            with open(config.versions, 'r') as file:
+                versions = file.read().strip().split('\n')
+        else:
+            versions = config.versions.strip().split(',')
     else:
         versions = []
         for tag in repo.tags:
@@ -239,7 +243,7 @@ def main():
         '''.format(
             Color.BOLD,
             os.path.basename(config.patch.name),
-            os.path.basename(os.path.abspath(config.project)),
+            os.path.abspath(config.project),
             Color.END
         )
     )
