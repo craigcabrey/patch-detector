@@ -188,6 +188,22 @@ def run_dir(config):
         full_path = os.path.join(config.project, version)
 
 
+def determine_vulnerability_status(config, version_results):
+    for version, result in version_results.items():
+        if result['overall']['confident']:
+            additions = result['overall']['additions']
+            deletions = result['overall']['deletions']
+
+            result['vulnerable'] = False
+
+            if additions is not None and additions < config.additions_threshold:
+                result['vulnerable'] = True
+            if deletions is not None and deletions < config.additions_threshold:
+                result['vulnerable'] = True
+        else:
+            result['vulnerable'] = 'indeterminate'
+
+
 def process_arguments():
     parser = argparse.ArgumentParser(
         description='''
@@ -207,6 +223,22 @@ def process_arguments():
         type=argparse.FileType('w+'),
         default=sys.stdout,
         help='Path to store the results'
+    )
+
+    parser.add_argument(
+        '--additions-threshold',
+        type=float,
+        default=0.5,
+        metavar='0.0..1.0',
+        help='Threshold that must be met to satisfy the invulnerable requirement'
+    )
+
+    parser.add_argument(
+        '--deletions-threshold',
+        type=float,
+        default=0.25,
+        metavar='0.0..1.0',
+        help='Threshold that must be met to satisfy the invulnerable requirement'
     )
 
     parser.add_argument(
@@ -249,6 +281,8 @@ def main():
     )
 
     version_results = run(config)
+
+    determine_vulnerability_status(config, version_results)
 
     if version_results:
         json.dump(version_results, config.results, sort_keys=True, indent=4)
